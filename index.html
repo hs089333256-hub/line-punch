@@ -1,207 +1,155 @@
 <!DOCTYPE html>
-<html lang="zh-tw">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>補習班出勤打卡系統</title>
-  </head>
-  <body class="bg-gray-50 text-gray-800 pb-12">
-    <!-- 頂部身分狀態 -->
-    <div class="bg-emerald-600 text-white p-4 shadow-md flex justify-between items-center">
-      <div>
-        <h1 class="text-lg font-bold">出勤管理系統</h1>
-        <p id="userDesc" class="text-xs text-emerald-100">身分驗證中...</p>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>補習班出勤打卡系統</title>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: #f3f4f6; color: #1f2937; padding-bottom: 50px; }
+    .header { background: #059669; color: white; padding: 16px; display: flex; justify-content: space-between; align-items: center; }
+    .header h1 { font-size: 18px; font-weight: bold; }
+    .badge { font-size: 12px; background: #065f46; padding: 4px 10px; border-radius: 9999px; }
+    .btn-copy { font-size: 10px; background: #047857; color: white; border: 1px solid #34d399; padding: 2px 6px; border-radius: 4px; margin-left: 6px; cursor: pointer; }
+    .container { max-width: 480px; margin: 0 auto; padding: 16px; }
+    .card { background: white; border-radius: 12px; padding: 16px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .card-title { font-size: 15px; font-weight: bold; margin-bottom: 12px; display: flex; align-items: center; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; color: white; transition: 0.1s; }
+    .btn:active { transform: scale(0.98); }
+    .btn-green { background: #059669; }
+    .btn-blue { background: #2563eb; }
+    .btn-orange { background: #d97706; }
+    .btn-dark { background: #374151; }
+    .input { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; margin-bottom: 8px; }
+    .alert { padding: 10px; border-radius: 8px; font-size: 12px; margin-bottom: 12px; }
+    .alert-error { background: #fee2e2; color: #b91c1c; border: 1px solid #f87171; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+  <!-- 頂部身分欄 -->
+  <div class="header">
+    <div>
+      <h1>出勤管理系統</h1>
+      <div style="display: flex; align-items: center; margin-top: 4px;">
+        <span id="userDesc" style="font-size: 12px; opacity: 0.9;">連線初始化中...</span>
+        <button id="copyBtn" onclick="copyMyUid()" class="btn-copy hidden">複製 UID</button>
       </div>
-      <span id="roleBadge" class="text-xs bg-emerald-800 px-2.5 py-1 rounded-full font-medium">連線中</span>
+    </div>
+    <span id="roleBadge" class="badge">連線中</span>
+  </div>
+
+  <div class="container">
+    <!-- 錯誤警示訊息 -->
+    <div id="alertBox" class="alert alert-error hidden"></div>
+
+    <!-- 1. 初次綁定手機視窗 (尚未綁定員工資料時顯示) -->
+    <div id="bindModal" class="card hidden">
+      <div class="card-title">📱 首次使用身分綁定</div>
+      <p style="font-size: 12px; color: #6b7280; margin-bottom: 10px;">請輸入主任建檔時登記的手機號碼完成驗證：</p>
+      <input type="tel" id="bindPhoneInput" placeholder="請輸入手機號碼 (如: 0912345678)" class="input">
+      <button onclick="bindPhone()" class="btn btn-green">驗證並完成綁定</button>
     </div>
 
-    <div class="max-w-md mx-auto p-4 space-y-4">
-      <!-- 1. 初次登入綁定手機視窗 (未綁定時顯示) -->
-      <div id="bindModal" class="hidden bg-white rounded-2xl shadow p-5 border border-emerald-100 space-y-3">
-        <h2 class="font-bold text-base text-gray-800">首次使用身分綁定</h2>
-        <p class="text-xs text-gray-500 leading-relaxed">
-          此 LINE 帳號尚未與補習班員工名冊綁定。請輸入主任建檔時留下的手機號碼完成驗證：
-        </p>
-        <input
-          type="tel"
-          id="bindPhoneInput"
-          placeholder="請輸入手機 (例: 0912345678)"
-          class="w-full border rounded-lg p-2.5 text-sm"
-        />
-        <button
-          onclick="bindPhone()"
-          class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-lg text-sm transition shadow"
-        >
-          驗證並完成綁定
-        </button>
+    <!-- 2. 員工操作區 -->
+    <div id="staffSection" class="hidden">
+      <!-- 打卡 -->
+      <div class="card">
+        <div class="card-title">📍 現場 GPS 考勤打卡</div>
+        <div class="grid-2">
+          <button onclick="punch('上班')" class="btn btn-green">上班打卡</button>
+          <button onclick="punch('下班')" class="btn btn-blue">下班打卡</button>
+        </div>
+        <p id="punchStatus" style="font-size: 12px; text-align: center; color: #6b7280; margin-top: 10px;"></p>
       </div>
 
-      <!-- 2. 員工核心操作區 -->
-      <div id="staffSection" class="hidden space-y-4">
-        <!-- 現場打卡 -->
-        <div class="bg-white rounded-2xl shadow-sm p-4 border border-gray-100">
-          <h2 class="font-bold text-gray-700 mb-2 flex items-center text-sm">
-            <span class="mr-2">📍</span>
-            現場 GPS 考勤打卡
-          </h2>
-          <div class="grid grid-cols-2 gap-3 mt-3">
-            <button
-              onclick="punch('上班')"
-              class="w-full bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold py-3 rounded-xl shadow transition"
-            >
-              上班打卡
-            </button>
-            <button
-              onclick="punch('下班')"
-              class="w-full bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold py-3 rounded-xl shadow transition"
-            >
-              下班打卡
-            </button>
-          </div>
-          <p id="punchStatus" class="text-xs text-center text-gray-500 mt-2 min-h-[1rem]"></p>
+      <!-- 補打卡 -->
+      <div class="card">
+        <div class="card-title">📝 忘記打卡？申請補打卡</div>
+        <input type="date" id="mkDate" class="input">
+        <div class="grid-2">
+          <select id="mkType" class="input">
+            <option value="上班">補上班卡</option>
+            <option value="下班">補下班卡</option>
+          </select>
+          <input type="time" id="mkTime" value="13:30" class="input">
         </div>
-
-        <!-- 補打卡申請 -->
-        <div class="bg-white rounded-2xl shadow-sm p-4 border border-gray-100">
-          <h2 class="font-bold text-gray-700 mb-2 flex items-center text-sm">
-            <span class="mr-2">📝</span>
-            忘記打卡？申請補打卡
-          </h2>
-          <div class="space-y-2 text-sm">
-            <input type="date" id="mkDate" class="w-full border rounded-lg p-2 text-xs" />
-            <div class="grid grid-cols-2 gap-2">
-              <select id="mkType" class="border rounded-lg p-2 text-xs">
-                <option value="上班">補上班卡</option>
-                <option value="下班">補下班卡</option>
-              </select>
-              <input type="time" id="mkTime" value="13:30" class="border rounded-lg p-2 text-xs" />
-            </div>
-            <input
-              type="text"
-              id="mkReason"
-              placeholder="事由 (例: 帶班輔導、手機沒電)"
-              class="w-full border rounded-lg p-2 text-xs"
-            />
-            <button
-              onclick="submitMakeup()"
-              class="w-full bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-semibold py-2 rounded-lg text-xs transition"
-            >
-              送出審核給主任
-            </button>
-          </div>
-        </div>
-
-        <!-- 請假登記 -->
-        <div class="bg-white rounded-2xl shadow-sm p-4 border border-gray-100">
-          <h2 class="font-bold text-gray-700 mb-2 flex items-center text-sm">
-            <span class="mr-2">📅</span>
-            請假報備
-          </h2>
-          <div class="space-y-2 text-sm">
-            <div class="grid grid-cols-2 gap-2">
-              <div>
-                <label class="text-[10px] text-gray-400">起始時間</label>
-                <input type="datetime-local" id="lvStart" class="w-full border rounded-lg p-1.5 text-xs" />
-              </div>
-              <div>
-                <label class="text-[10px] text-gray-400">結束時間</label>
-                <input type="datetime-local" id="lvEnd" class="w-full border rounded-lg p-1.5 text-xs" />
-              </div>
-            </div>
-            <div class="grid grid-cols-2 gap-2">
-              <select id="lvType" class="border rounded-lg p-2 text-xs">
-                <option value="事假">事假</option>
-                <option value="病假">病假</option>
-                <option value="公假">公假</option>
-                <option value="調課">調課</option>
-              </select>
-              <input type="text" id="lvReason" placeholder="請假事由" class="border rounded-lg p-2 text-xs" />
-            </div>
-            <button
-              onclick="submitLeave()"
-              class="w-full bg-slate-700 hover:bg-slate-800 active:scale-95 text-white font-semibold py-2 rounded-lg text-xs transition"
-            >
-              送出請假登記
-            </button>
-          </div>
-        </div>
+        <input type="text" id="mkReason" placeholder="補簽事由 (例: 手機沒電)" class="input">
+        <button onclick="submitMakeup()" class="btn btn-orange">送出補簽審核</button>
       </div>
 
-      <!-- 3. 主任後台管理區 -->
-      <div id="adminSection" class="hidden space-y-4">
-        <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-3">
-          <h2 class="font-bold text-amber-900 flex items-center text-sm">
-            <span class="mr-2">⚙️</span>
-            主任專屬：建立/修改員工資料與排班
-          </h2>
-          <div class="space-y-2 text-xs">
-            <input
-              type="tel"
-              id="admPhone"
-              placeholder="員工手機號碼 (必填，供其自主綁定)"
-              class="w-full border rounded-lg p-2"
-            />
-            <input type="text" id="admName" placeholder="員工姓名 (必填)" class="w-full border rounded-lg p-2" />
-            <input
-              type="text"
-              id="admUid"
-              placeholder="員工 LINE UID (選填，首次可留空)"
-              class="w-full border rounded-lg p-2"
-            />
-            <div class="grid grid-cols-2 gap-2">
-              <select id="admRole" class="border rounded-lg p-2">
-                <option value="科目老師">科目老師</option>
-                <option value="行政人員">行政人員</option>
-                <option value="助教">助教</option>
-                <option value="主任">主任</option>
-              </select>
-              <select id="admSalaryType" class="border rounded-lg p-2">
-                <option value="時薪">時薪制</option>
-                <option value="月薪">月薪制</option>
-              </select>
-            </div>
-            <input type="number" id="admRate" placeholder="時薪或月薪金額" class="w-full border rounded-lg p-2" />
-            <input
-              type="text"
-              id="admWorkDays"
-              placeholder="工作日代碼 (如 1,2,3,4,5 代表週一至五)"
-              value="1,2,3,4,5"
-              class="w-full border rounded-lg p-2"
-            />
-            <div class="grid grid-cols-2 gap-2">
-              <div>
-                <label class="text-[10px] text-gray-500">上班時間</label>
-                <input type="time" id="admShiftStart" value="13:30" class="w-full border rounded-lg p-1.5" />
-              </div>
-              <div>
-                <label class="text-[10px] text-gray-500">下班時間</label>
-                <input type="time" id="admShiftEnd" value="21:30" class="w-full border rounded-lg p-1.5" />
-              </div>
-            </div>
-            <select id="admStatus" class="w-full border rounded-lg p-2">
-              <option value="在職">在職</option>
-              <option value="離職">離職</option>
-            </select>
-            <button
-              onclick="saveEmployee()"
-              class="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-2 rounded-lg text-xs transition"
-            >
-              儲存員工與班表設定
-            </button>
-          </div>
+      <!-- 請假 -->
+      <div class="card">
+        <div class="card-title">📅 請假報備</div>
+        <label style="font-size: 10px; color: #9ca3af;">起始時間</label>
+        <input type="datetime-local" id="lvStart" class="input">
+        <label style="font-size: 10px; color: #9ca3af;">結束時間</label>
+        <input type="datetime-local" id="lvEnd" class="input">
+        <div class="grid-2">
+          <select id="lvType" class="input">
+            <option value="事假">事假</option>
+            <option value="病假">病假</option>
+            <option value="公假">公假</option>
+            <option value="調課">調課</option>
+          </select>
+          <input type="text" id="lvReason" placeholder="事由說明" class="input">
         </div>
+        <button onclick="submitLeave()" class="btn btn-dark">登記請假</button>
       </div>
     </div>
 
-    <script>
-      // 請替換為您個人的實體字串
-      const LIFF_ID = "2011459023-saFliMoi";
-      const GAS_URL = "https://script.google.com/macros/s/AKfycbz_4-16UehoqH-ki8UhsxUay127V4Wp1v1lZ0t3smNT2QJBPwH2x_yj1SrE4U_eJx1W/exec";
+    <!-- 3. 主任後台區 -->
+    <div id="adminSection" class="card hidden" style="background: #fffbeb; border: 1px solid #fde68a;">
+      <div class="card-title" style="color: #92400e;">⚙️ 主任管理：建立/修改員工</div>
+      <input type="tel" id="admPhone" placeholder="員工手機 (必填)" class="input">
+      <input type="text" id="admName" placeholder="員工姓名 (必填)" class="input">
+      <input type="text" id="admUid" placeholder="LINE UID (選填)" class="input">
+      <div class="grid-2">
+        <select id="admRole" class="input">
+          <option value="科目老師">科目老師</option>
+          <option value="行政人員">行政人員</option>
+          <option value="助教">助教</option>
+          <option value="主任">主任</option>
+        </select>
+        <select id="admSalaryType" class="input">
+          <option value="時薪">時薪制</option>
+          <option value="月薪">月薪制</option>
+        </select>
+      </div>
+      <input type="number" id="admRate" placeholder="時薪或底薪金額" class="input">
+      <input type="text" id="admWorkDays" placeholder="工作日代碼 (如 1,2,3,4,5)" value="1,2,3,4,5" class="input">
+      <div class="grid-2">
+        <input type="time" id="admShiftStart" value="13:30" class="input">
+        <input type="time" id="admShiftEnd" value="21:30" class="input">
+      </div>
+      <select id="admStatus" class="input">
+        <option value="在職">在職</option>
+        <option value="離職">離職</option>
+      </select>
+      <button onclick="saveEmployee()" class="btn btn-orange">儲存員工設定</button>
+    </div>
 
-      let currentUser = null;
+  </div>
 
-      async function init() {
+  <script>
+    const LIFF_ID = "2011459023-saFliMoi";
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbz_4-16UehoqH-ki8UhsxUay127V4Wp1v1lZ0t3smNT2QJBPwH2x_yj1SrE4U_eJx1W/exec"; 
+
+    let currentUser = null;
+
+    function showErr(msg) {
+      const box = document.getElementById("alertBox");
+      box.innerText = msg;
+      box.classList.remove("hidden");
+    }
+
+    async function init() {
+      try {
         await liff.init({ liffId: LIFF_ID });
+
         if (!liff.isLoggedIn()) {
           liff.login();
           return;
@@ -209,70 +157,89 @@
 
         const profile = await liff.getProfile();
         currentUser = profile;
-        document.getElementById("userDesc").innerText = `${profile.displayName}`;
+        document.getElementById("userDesc").innerText = profile.displayName;
+        document.getElementById("copyBtn").classList.remove("hidden");
 
-        // 檢查是否已在 Employees 資料表
+        if (GAS_URL === "YOUR_GAS_WEBAPP_URL" || !GAS_URL.endsWith("/exec")) {
+          showErr("請在 index.html 填入正確的 GAS_URL (需以 /exec 結尾)");
+          document.getElementById("roleBadge").innerText = "設定未完成";
+          return;
+        }
+
+        // 發出請求給 GAS
         const res = await fetch(GAS_URL, {
           method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
           body: JSON.stringify({ action: "checkUser", uid: profile.userId })
         });
+
         const data = await res.json();
 
         if (data.success) {
           if (!data.isRegistered) {
-            // 未註冊/未綁定：顯示手機驗證模組
+            // 未綁定
             document.getElementById("bindModal").classList.remove("hidden");
             document.getElementById("roleBadge").innerText = "尚未綁定";
           } else {
-            // 已綁定
+            // 已綁定員工
             document.getElementById("staffSection").classList.remove("hidden");
             document.getElementById("roleBadge").innerText = data.user.role;
             currentUser = { ...currentUser, ...data.user };
           }
 
-          // 主任身分
           if (data.isAdmin) {
             document.getElementById("adminSection").classList.remove("hidden");
+            document.getElementById("staffSection").classList.remove("hidden");
             document.getElementById("roleBadge").innerText = "主任 (管理員)";
           }
+        } else {
+          showErr("後端連線失敗: " + data.message);
         }
+      } catch (err) {
+        showErr("初始化失敗: " + err.message);
+        document.getElementById("roleBadge").innerText = "連線錯誤";
       }
+    }
 
-      // 手機號碼綁定
-      async function bindPhone() {
-        const phone = document.getElementById("bindPhoneInput").value.trim();
-        if (!phone) {
-          alert("請輸入完整手機號碼！");
-          return;
-        }
+    function copyMyUid() {
+      if (currentUser && currentUser.userId) {
+        navigator.clipboard.writeText(currentUser.userId).then(() => {
+          alert("已複製 LINE UID:\n" + currentUser.userId);
+        }).catch(() => {
+          prompt("請手動複製你的 LINE UID：", currentUser.userId);
+        });
+      }
+    }
 
+    async function bindPhone() {
+      const phone = document.getElementById("bindPhoneInput").value.trim();
+      if (!phone) { alert("請輸入手機！"); return; }
+
+      try {
         const res = await fetch(GAS_URL, {
           method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
           body: JSON.stringify({ action: "bindPhone", uid: currentUser.userId, phone: phone })
         });
         const result = await res.json();
         alert(result.message);
-
-        if (result.success) {
-          location.reload();
-        }
+        if (result.success) location.reload();
+      } catch (err) {
+        alert("綁定失敗: " + err.message);
       }
+    }
 
-      // GPS 打卡
-      function punch(type) {
-        const status = document.getElementById("punchStatus");
-        status.innerText = "GPS 定位中...";
+    function punch(type) {
+      const status = document.getElementById("punchStatus");
+      status.innerText = "GPS 定位中...";
 
-        if (!navigator.geolocation) {
-          alert("瀏覽器不支援定位功能");
-          return;
-        }
-
-        navigator.geolocation.getCurrentPosition(
-          async (pos) => {
-            status.innerText = "傳輸打卡資料...";
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          status.innerText = "打卡傳輸中...";
+          try {
             const res = await fetch(GAS_URL, {
               method: "POST",
+              headers: { "Content-Type": "text/plain;charset=utf-8" },
               body: JSON.stringify({
                 action: "clockInOut",
                 uid: currentUser.userId,
@@ -285,101 +252,96 @@
             const result = await res.json();
             alert(result.message);
             status.innerText = result.message.replace(/\n/g, " ");
-          },
-          (err) => {
-            alert("無法取得位置，請確認 LINE 是否允許使用 GPS 定位。");
-            status.innerText = "定位失敗";
-          },
-          { enableHighAccuracy: true, timeout: 10000 }
-        );
-      }
+          } catch (e) {
+            alert("打卡失敗: " + e.message);
+            status.innerText = "傳輸失敗";
+          }
+        },
+        (err) => {
+          alert("定位失敗，請在 iPhone [設定] ➔ [隱私權與安全性] ➔ [定位服務] ➔ 允許 LINE 取用位置資訊。");
+          status.innerText = "定位失敗";
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    }
 
-      // 補打卡申請
-      async function submitMakeup() {
-        const date = document.getElementById("mkDate").value;
-        const type = document.getElementById("mkType").value;
-        const punchTime = document.getElementById("mkTime").value;
-        const reason = document.getElementById("mkReason").value;
+    async function submitMakeup() {
+      const date = document.getElementById("mkDate").value;
+      const type = document.getElementById("mkType").value;
+      const punchTime = document.getElementById("mkTime").value;
+      const reason = document.getElementById("mkReason").value;
 
-        if (!date || !reason) {
-          alert("請完整選擇日期與原因！");
-          return;
-        }
+      if (!date || !reason) { alert("請選擇日期與事由！"); return; }
 
-        const res = await fetch(GAS_URL, {
-          method: "POST",
-          body: JSON.stringify({
-            action: "applyMakeup",
-            uid: currentUser.userId,
-            name: currentUser.displayName,
-            date: date,
-            type: type,
-            punchTime: punchTime,
-            reason: reason
-          })
-        });
-        const result = await res.json();
-        alert(result.message);
-      }
+      const res = await fetch(GAS_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({
+          action: "applyMakeup",
+          uid: currentUser.userId,
+          name: currentUser.displayName,
+          date: date,
+          type: type,
+          punchTime: punchTime,
+          reason: reason
+        })
+      });
+      const result = await res.json();
+      alert(result.message);
+    }
 
-      // 請假登記
-      async function submitLeave() {
-        const start = document.getElementById("lvStart").value;
-        const end = document.getElementById("lvEnd").value;
-        const type = document.getElementById("lvType").value;
-        const reason = document.getElementById("lvReason").value;
+    async function submitLeave() {
+      const start = document.getElementById("lvStart").value;
+      const end = document.getElementById("lvEnd").value;
+      const type = document.getElementById("lvType").value;
+      const reason = document.getElementById("lvReason").value;
 
-        if (!start || !end) {
-          alert("請完整填寫請假起迄時間！");
-          return;
-        }
+      if (!start || !end) { alert("請填寫起訖時間！"); return; }
 
-        const res = await fetch(GAS_URL, {
-          method: "POST",
-          body: JSON.stringify({
-            action: "applyLeave",
-            uid: currentUser.userId,
-            name: currentUser.displayName,
-            startDate: start,
-            endDate: end,
-            leaveType: type,
-            reason: reason
-          })
-        });
-        const result = await res.json();
-        alert(result.message);
-      }
+      const res = await fetch(GAS_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({
+          action: "applyLeave",
+          uid: currentUser.userId,
+          name: currentUser.displayName,
+          startDate: start,
+          endDate: end,
+          leaveType: type,
+          reason: reason
+        })
+      });
+      const result = await res.json();
+      alert(result.message);
+    }
 
-      // 主任儲存員工設定
-      async function saveEmployee() {
-        const payload = {
-          action: "adminSaveEmployee",
-          phone: document.getElementById("admPhone").value.trim(),
-          name: document.getElementById("admName").value.trim(),
-          targetUid: document.getElementById("admUid").value.trim(),
-          role: document.getElementById("admRole").value,
-          salaryType: document.getElementById("admSalaryType").value,
-          hourlyRate: document.getElementById("admRate").value,
-          workDays: document.getElementById("admWorkDays").value.trim(),
-          shiftStart: document.getElementById("admShiftStart").value,
-          shiftEnd: document.getElementById("admShiftEnd").value,
-          status: document.getElementById("admStatus").value
-        };
+    async function saveEmployee() {
+      const payload = {
+        action: "adminSaveEmployee",
+        phone: document.getElementById("admPhone").value.trim(),
+        name: document.getElementById("admName").value.trim(),
+        targetUid: document.getElementById("admUid").value.trim(),
+        role: document.getElementById("admRole").value,
+        salaryType: document.getElementById("admSalaryType").value,
+        hourlyRate: document.getElementById("admRate").value,
+        workDays: document.getElementById("admWorkDays").value.trim(),
+        shiftStart: document.getElementById("admShiftStart").value,
+        shiftEnd: document.getElementById("admShiftEnd").value,
+        status: document.getElementById("admStatus").value
+      };
 
-        if (!payload.phone || !payload.name) {
-          alert("請至少填妥手機與姓名！");
-          return;
-        }
+      if (!payload.phone || !payload.name) { alert("請填寫手機與姓名！"); return; }
 
-        const res = await fetch(GAS_URL, {
-          method: "POST",
-          body: JSON.stringify(payload)
-        });
-        const result = await res.json();
-        alert(result.message);
-      }
+      const res = await fetch(GAS_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(payload)
+      });
+      const result = await res.json();
+      alert(result.message);
+    }
 
-      window.onload = init;
-    </script>
-  </body>
+    window.onload = init;
+  </script>
+</body>
 </html>
