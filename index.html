@@ -3,26 +3,30 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>補習班出勤打卡系統</title>
+  <title>考勤打卡系統 Attendance System</title>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { background-color: #f3f4f6; color: #1f2937; padding-bottom: 50px; }
     .header { background: #059669; color: white; padding: 16px; display: flex; justify-content: space-between; align-items: center; }
-    .header h1 { font-size: 18px; font-weight: bold; }
-    .badge { font-size: 12px; background: #065f46; padding: 4px 10px; border-radius: 9999px; }
+    .header h1 { font-size: 17px; font-weight: bold; }
+    .header .subtitle { font-size: 11px; opacity: 0.85; }
+    .badge { font-size: 11px; background: #065f46; padding: 4px 10px; border-radius: 9999px; }
     .btn-copy { font-size: 10px; background: #047857; color: white; border: 1px solid #34d399; padding: 2px 6px; border-radius: 4px; margin-left: 6px; cursor: pointer; }
     .container { max-width: 480px; margin: 0 auto; padding: 16px; }
     .card { background: white; border-radius: 12px; padding: 16px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
     .card-title { font-size: 15px; font-weight: bold; margin-bottom: 12px; display: flex; align-items: center; }
+    .card-title span.en { font-size: 12px; font-weight: normal; color: #6b7280; margin-left: 6px; }
     .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; color: white; transition: 0.1s; }
+    .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; font-weight: bold; font-size: 13px; cursor: pointer; color: white; transition: 0.1s; text-align: center; }
     .btn:active { transform: scale(0.98); }
+    .btn span.btn-sub { display: block; font-size: 10px; font-weight: normal; opacity: 0.9; }
     .btn-green { background: #059669; }
     .btn-blue { background: #2563eb; }
     .btn-orange { background: #d97706; }
     .btn-dark { background: #374151; }
     .input { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; margin-bottom: 8px; }
+    .label-hint { font-size: 11px; color: #6b7280; margin-bottom: 3px; display: block; }
     .alert { padding: 10px; border-radius: 8px; font-size: 12px; margin-bottom: 12px; }
     .alert-error { background: #fee2e2; color: #b91c1c; border: 1px solid #f87171; }
     .hidden { display: none !important; }
@@ -30,113 +34,159 @@
 </head>
 <body>
 
-  <!-- 頂部身分欄 -->
+  <!-- 頂部資訊欄 Header -->
   <div class="header">
     <div>
-      <h1>出勤管理系統</h1>
+      <h1>出勤管理系統 <span class="subtitle">Attendance System</span></h1>
       <div style="display: flex; align-items: center; margin-top: 4px;">
-        <span id="userDesc" style="font-size: 12px; opacity: 0.9;">連線初始化中...</span>
+        <span id="userDesc" style="font-size: 12px; opacity: 0.9;">連線中 Connecting...</span>
         <button id="copyBtn" onclick="copyMyUid()" class="btn-copy hidden">複製 UID</button>
       </div>
     </div>
-    <span id="roleBadge" class="badge">連線中</span>
+    <span id="roleBadge" class="badge">Checking...</span>
   </div>
 
   <div class="container">
-    <!-- 錯誤警示訊息 -->
     <div id="alertBox" class="alert alert-error hidden"></div>
 
-    <!-- 1. 初次綁定手機視窗 (尚未綁定員工資料時顯示) -->
+    <!-- 1. 初次綁定手機視窗 Phone Binding Modal (未註冊時顯示) -->
     <div id="bindModal" class="card hidden">
-      <div class="card-title">📱 首次使用身分綁定</div>
-      <p style="font-size: 12px; color: #6b7280; margin-bottom: 10px;">請輸入主任建檔時登記的手機號碼完成驗證：</p>
-      <input type="tel" id="bindPhoneInput" placeholder="請輸入手機號碼 (如: 0912345678)" class="input">
-      <button onclick="bindPhone()" class="btn btn-green">驗證並完成綁定</button>
+      <div class="card-title">📱 首次使用身分綁定 <span class="en">Phone Verification</span></div>
+      <p style="font-size: 12px; color: #6b7280; margin-bottom: 10px;">
+        此 LINE 帳號尚未綁定員工名冊，請輸入留存的手機號碼驗證：<br>
+        <span style="font-size: 11px; color: #9ca3af;">Please enter registered phone number to link your account.</span>
+      </p>
+      <input type="tel" id="bindPhoneInput" placeholder="手機號碼 Phone (e.g. 0912345678)" class="input">
+      <button onclick="bindPhone()" class="btn btn-green">
+        驗證並完成綁定 <span class="btn-sub">Verify & Bind</span>
+      </button>
     </div>
 
-    <!-- 2. 員工操作區 -->
+    <!-- 2. 員工操作區 Staff Section (已註冊員工可見) -->
     <div id="staffSection" class="hidden">
-      <!-- 打卡 -->
+      <!-- 現場打卡 GPS Punch -->
       <div class="card">
-        <div class="card-title">📍 現場 GPS 考勤打卡</div>
+        <div class="card-title">📍 現場考勤打卡 <span class="en">GPS Clock In / Out</span></div>
         <div class="grid-2">
-          <button onclick="punch('上班')" class="btn btn-green">上班打卡</button>
-          <button onclick="punch('下班')" class="btn btn-blue">下班打卡</button>
+          <button onclick="punch('上班')" class="btn btn-green">
+            上班打卡 <span class="btn-sub">Clock In</span>
+          </button>
+          <button onclick="punch('下班')" class="btn btn-blue">
+            下班打卡 <span class="btn-sub">Clock Out</span>
+          </button>
         </div>
-        <p id="punchStatus" style="font-size: 12px; text-align: center; color: #6b7280; margin-top: 10px;"></p>
+        <p id="punchStatus" style="font-size: 11px; text-align: center; color: #6b7280; margin-top: 10px;"></p>
       </div>
 
-      <!-- 補打卡 -->
+      <!-- 補打卡 Makeup Request -->
       <div class="card">
-        <div class="card-title">📝 忘記打卡？申請補打卡</div>
+        <div class="card-title">📝 忘記打卡？申請補打卡 <span class="en">Makeup Punch</span></div>
+        <span class="label-hint">補簽日期 Target Date</span>
         <input type="date" id="mkDate" class="input">
         <div class="grid-2">
-          <select id="mkType" class="input">
-            <option value="上班">補上班卡</option>
-            <option value="下班">補下班卡</option>
-          </select>
-          <input type="time" id="mkTime" value="13:30" class="input">
+          <div>
+            <span class="label-hint">類別 Type</span>
+            <select id="mkType" class="input">
+              <option value="上班">上班 (In)</option>
+              <option value="下班">下班 (Out)</option>
+            </select>
+          </div>
+          <div>
+            <span class="label-hint">時間 Time</span>
+            <input type="time" id="mkTime" value="13:30" class="input">
+          </div>
         </div>
-        <input type="text" id="mkReason" placeholder="補簽事由 (例: 手機沒電)" class="input">
-        <button onclick="submitMakeup()" class="btn btn-orange">送出補簽審核</button>
+        <span class="label-hint">事由 Reason</span>
+        <input type="text" id="mkReason" placeholder="例: 手機沒電 / 外勤帶班" class="input">
+        <button onclick="submitMakeup()" class="btn btn-orange">
+          送出補簽審核 <span class="btn-sub">Submit Makeup Request</span>
+        </button>
       </div>
 
-      <!-- 請假 -->
+      <!-- 請假登記 Leave Request -->
       <div class="card">
-        <div class="card-title">📅 請假報備</div>
-        <label style="font-size: 10px; color: #9ca3af;">起始時間</label>
+        <div class="card-title">📅 請假報備 <span class="en">Leave Application</span></div>
+        <span class="label-hint">起始時間 Start Time</span>
         <input type="datetime-local" id="lvStart" class="input">
-        <label style="font-size: 10px; color: #9ca3af;">結束時間</label>
+        <span class="label-hint">結束時間 End Time</span>
         <input type="datetime-local" id="lvEnd" class="input">
         <div class="grid-2">
-          <select id="lvType" class="input">
-            <option value="事假">事假</option>
-            <option value="病假">病假</option>
-            <option value="公假">公假</option>
-            <option value="調課">調課</option>
-          </select>
-          <input type="text" id="lvReason" placeholder="事由說明" class="input">
+          <div>
+            <span class="label-hint">假別 Leave Type</span>
+            <select id="lvType" class="input">
+              <option value="事假">事假 Personal</option>
+              <option value="病假">病假 Sick</option>
+              <option value="公假">公假 Official</option>
+              <option value="調課">調課 Reschedule</option>
+            </select>
+          </div>
+          <div>
+            <span class="label-hint">事由 Reason</span>
+            <input type="text" id="lvReason" placeholder="事由說明" class="input">
+          </div>
         </div>
-        <button onclick="submitLeave()" class="btn btn-dark">登記請假</button>
+        <button onclick="submitLeave()" class="btn btn-dark">
+          登記請假 <span class="btn-sub">Submit Leave</span>
+        </button>
       </div>
     </div>
 
-    <!-- 3. 主任後台區 -->
+    <!-- 3. 主任後台區 Admin Section (僅管理者可見，一般人完全隱藏) -->
     <div id="adminSection" class="card hidden" style="background: #fffbeb; border: 1px solid #fde68a;">
-      <div class="card-title" style="color: #92400e;">⚙️ 主任管理：建立/修改員工</div>
-      <input type="tel" id="admPhone" placeholder="員工手機 (必填)" class="input">
-      <input type="text" id="admName" placeholder="員工姓名 (必填)" class="input">
-      <input type="text" id="admUid" placeholder="LINE UID (選填)" class="input">
+      <div class="card-title" style="color: #92400e;">⚙️ 主任管理專區 <span class="en">Admin Panel</span></div>
+      <span class="label-hint">員工手機 (供其自行綁定) Phone</span>
+      <input type="tel" id="admPhone" placeholder="手機 (必填 Required)" class="input">
+      <span class="label-hint">員工姓名 Full Name</span>
+      <input type="text" id="admName" placeholder="姓名 (必填 Required)" class="input">
+      <span class="label-hint">LINE UID (選填 Optional)</span>
+      <input type="text" id="admUid" placeholder="留空時由員工以手機自主綁定" class="input">
       <div class="grid-2">
-        <select id="admRole" class="input">
-          <option value="科目老師">科目老師</option>
-          <option value="行政人員">行政人員</option>
-          <option value="助教">助教</option>
-          <option value="主任">主任</option>
-        </select>
-        <select id="admSalaryType" class="input">
-          <option value="時薪">時薪制</option>
-          <option value="月薪">月薪制</option>
-        </select>
+        <div>
+          <span class="label-hint">職位 Role</span>
+          <select id="admRole" class="input">
+            <option value="科目老師">科目老師 Teacher</option>
+            <option value="行政人員">行政人員 Staff</option>
+            <option value="助教">助教 TA</option>
+            <option value="主任">主任 Director</option>
+          </select>
+        </div>
+        <div>
+          <span class="label-hint">計薪方式 Salary Type</span>
+          <select id="admSalaryType" class="input">
+            <option value="時薪">時薪 Hourly</option>
+            <option value="月薪">月薪 Monthly</option>
+          </select>
+        </div>
       </div>
-      <input type="number" id="admRate" placeholder="時薪或底薪金額" class="input">
-      <input type="text" id="admWorkDays" placeholder="工作日代碼 (如 1,2,3,4,5)" value="1,2,3,4,5" class="input">
+      <span class="label-hint">時薪或底薪金額 Rate / Base Salary</span>
+      <input type="number" id="admRate" placeholder="例如: 400" class="input">
+      <span class="label-hint">上班日代碼 Work Days (1=Mon, 7=Sun)</span>
+      <input type="text" id="admWorkDays" placeholder="例如: 1,2,3,4,5" value="1,2,3,4,5" class="input">
       <div class="grid-2">
-        <input type="time" id="admShiftStart" value="13:30" class="input">
-        <input type="time" id="admShiftEnd" value="21:30" class="input">
+        <div>
+          <span class="label-hint">上班時間 Shift Start</span>
+          <input type="time" id="admShiftStart" value="13:30" class="input">
+        </div>
+        <div>
+          <span class="label-hint">下班時間 Shift End</span>
+          <input type="time" id="admShiftEnd" value="21:30" class="input">
+        </div>
       </div>
+      <span class="label-hint">在職狀態 Status</span>
       <select id="admStatus" class="input">
-        <option value="在職">在職</option>
-        <option value="離職">離職</option>
+        <option value="在職">在職 Active</option>
+        <option value="離職">離職 Inactive</option>
       </select>
-      <button onclick="saveEmployee()" class="btn btn-orange">儲存員工設定</button>
+      <button onclick="saveEmployee()" class="btn btn-orange" style="margin-top: 5px;">
+        儲存員工設定 <span class="btn-sub">Save Employee Settings</span>
+      </button>
     </div>
 
   </div>
 
   <script>
     const LIFF_ID = "2011459023-saFliMoi";
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbz_4-16UehoqH-ki8UhsxUay127V4Wp1v1lZ0t3smNT2QJBPwH2x_yj1SrE4U_eJx1W/exec"; 
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbz_4-16UehoqH-ki8UhsxUay127V4Wp1v1lZ0t3smNT2QJBPwH2x_yj1SrE4U_eJx1W/exec";
 
     let currentUser = null;
 
@@ -166,7 +216,7 @@
           return;
         }
 
-        // 發出請求給 GAS
+        // 向 GAS 發送身分驗證
         const res = await fetch(GAS_URL, {
           method: "POST",
           headers: { "Content-Type": "text/plain;charset=utf-8" },
@@ -176,28 +226,35 @@
         const data = await res.json();
 
         if (data.success) {
-          if (!data.isRegistered) {
-            // 未綁定
-            document.getElementById("bindModal").classList.remove("hidden");
-            document.getElementById("roleBadge").innerText = "尚未綁定";
-          } else {
-            // 已綁定員工
-            document.getElementById("staffSection").classList.remove("hidden");
-            document.getElementById("roleBadge").innerText = data.user.role;
-            currentUser = { ...currentUser, ...data.user };
-          }
-
+          // 1. 判斷是否為主任（管理員）
           if (data.isAdmin) {
             document.getElementById("adminSection").classList.remove("hidden");
             document.getElementById("staffSection").classList.remove("hidden");
-            document.getElementById("roleBadge").innerText = "主任 (管理員)";
+            document.getElementById("roleBadge").innerText = "主任 (Director)";
+            if (data.user) currentUser = { ...currentUser, ...data.user };
+            return;
+          }
+
+          // 2. 判斷是否為已註冊的一般員工
+          if (data.isRegistered && data.user) {
+            document.getElementById("staffSection").classList.remove("hidden");
+            document.getElementById("roleBadge").innerText = data.user.role;
+            currentUser = { ...currentUser, ...data.user };
+            // 確保管理區塊隱藏
+            document.getElementById("adminSection").classList.add("hidden");
+          } else {
+            // 3. 未註冊/未綁定訪客：只顯示手機綁定區塊
+            document.getElementById("bindModal").classList.remove("hidden");
+            document.getElementById("staffSection").classList.add("hidden");
+            document.getElementById("adminSection").classList.add("hidden");
+            document.getElementById("roleBadge").innerText = "未綁定 Unlinked";
           }
         } else {
           showErr("後端連線失敗: " + data.message);
         }
       } catch (err) {
-        showErr("初始化失敗: " + err.message);
-        document.getElementById("roleBadge").innerText = "連線錯誤";
+        showErr("初始化異常: " + err.message);
+        document.getElementById("roleBadge").innerText = "Error";
       }
     }
 
@@ -206,14 +263,14 @@
         navigator.clipboard.writeText(currentUser.userId).then(() => {
           alert("已複製 LINE UID:\n" + currentUser.userId);
         }).catch(() => {
-          prompt("請手動複製你的 LINE UID：", currentUser.userId);
+          prompt("請手動複製 LINE UID：", currentUser.userId);
         });
       }
     }
 
     async function bindPhone() {
       const phone = document.getElementById("bindPhoneInput").value.trim();
-      if (!phone) { alert("請輸入手機！"); return; }
+      if (!phone) { alert("請輸入手機號碼！Please enter phone number."); return; }
 
       try {
         const res = await fetch(GAS_URL, {
@@ -231,11 +288,11 @@
 
     function punch(type) {
       const status = document.getElementById("punchStatus");
-      status.innerText = "GPS 定位中...";
+      status.innerText = "GPS 定位中 Locating...";
 
       navigator.geolocation.getCurrentPosition(
         async (pos) => {
-          status.innerText = "打卡傳輸中...";
+          status.innerText = "打卡傳輸中 Submitting...";
           try {
             const res = await fetch(GAS_URL, {
               method: "POST",
@@ -254,12 +311,12 @@
             status.innerText = result.message.replace(/\n/g, " ");
           } catch (e) {
             alert("打卡失敗: " + e.message);
-            status.innerText = "傳輸失敗";
+            status.innerText = "連線失敗 Failed";
           }
         },
         (err) => {
-          alert("定位失敗，請在 iPhone [設定] ➔ [隱私權與安全性] ➔ [定位服務] ➔ 允許 LINE 取用位置資訊。");
-          status.innerText = "定位失敗";
+          alert("定位失敗！請開啟 iPhone [設定] ➔ [隱私權與安全性] ➔ [定位服務] ➔ 允許 LINE 取用位置。\nFailed to get GPS location.");
+          status.innerText = "定位失敗 Locating failed";
         },
         { enableHighAccuracy: true, timeout: 10000 }
       );
@@ -271,7 +328,7 @@
       const punchTime = document.getElementById("mkTime").value;
       const reason = document.getElementById("mkReason").value;
 
-      if (!date || !reason) { alert("請選擇日期與事由！"); return; }
+      if (!date || !reason) { alert("請填寫日期與事由！Please fill in date and reason."); return; }
 
       const res = await fetch(GAS_URL, {
         method: "POST",
@@ -296,7 +353,7 @@
       const type = document.getElementById("lvType").value;
       const reason = document.getElementById("lvReason").value;
 
-      if (!start || !end) { alert("請填寫起訖時間！"); return; }
+      if (!start || !end) { alert("請填妥起訖時間！Please select start and end time."); return; }
 
       const res = await fetch(GAS_URL, {
         method: "POST",
@@ -330,7 +387,7 @@
         status: document.getElementById("admStatus").value
       };
 
-      if (!payload.phone || !payload.name) { alert("請填寫手機與姓名！"); return; }
+      if (!payload.phone || !payload.name) { alert("請填寫手機與姓名！Please fill in phone and name."); return; }
 
       const res = await fetch(GAS_URL, {
         method: "POST",
